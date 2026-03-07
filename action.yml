@@ -1,0 +1,145 @@
+name: BuildGraph
+description: >
+  Analyse a Go monorepo call graph to determine which services changed,
+  then generate a fresh baseline for the next run.
+
+branding:
+  icon: git-branch
+  color: blue
+
+inputs:
+  version:
+    description: >
+      BuildGraph version to install (e.g. "v0.1.0"). Defaults to "latest".
+    required: false
+    default: latest
+
+  go-version-file:
+    description: >
+      Path to the go.mod file used to select the Go toolchain version.
+      Defaults to "go.mod" in the repository root.
+    required: false
+    default: go.mod
+
+  baseline-artifact-name:
+    description: >
+      Name of the GitHub Actions artifact used to persist the baseline
+      between runs. Must match across the upload and download steps.
+    required: false
+    default: buildgraph-baseline
+
+  baseline-retention-days:
+    description: Number of days to retain the baseline artifact.
+    required: false
+    default: "90"
+
+  config:
+    description: Path to buildgraph.yaml (overrides the default location).
+    required: false
+    default: ""
+
+  baseline:
+    description: Path to the baseline file (overrides buildgraph.yaml).
+    required: false
+    default: ""
+
+  working-directory:
+    description: >
+      Directory to run buildgraph from. Defaults to the repository root.
+    required: false
+    default: "."
+
+outputs:
+  has_changes:
+    description: "'true' if any functions changed, 'false' otherwise."
+    value: ${{ steps.analyze.outputs.has_changes }}
+
+  services:
+    description: >
+      JSON array of service names that need to be rebuilt,
+      e.g. '["service-a","service-b"]'. Empty array when has_changes is false.
+    value: ${{ steps.analyze.outputs.services }}
+
+  impact-file:
+    description: Path to the impact.json report written by buildgraph analyze.
+    value: ${{ steps.analyze.outputs.impact_file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: ${{ inputs.go-version-file }}
+        cache: true
+
+    # Restore the baseline from the previous run on this branch.
+    # continue-on-error so the very first run (no artifact yet) still works.
+    - name: Download previous baseline
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.baseline-artifact-name }}
+        path: .buildgraph
+      continue-on-error: true
+
+    - name: Install buildgraph
+      shell: bash
+      run: go install github.com/bubunyo/buildgraph/cmd@${{ inputs.version }}
+
+    - name: Run buildgraph analyze
+      id: analyze
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        BG_CONFIG: ${{ inputs.config }}
+        BG_BASELINE: ${{ inputs.baseline }}
+      run: |
+        IMPACT_FILE="${RUNNER_TEMP}/impact.json"
+
+        EXTRA_ARGS=""
+        [ -n "${BG_CONFIG}"   ] && EXTRA_ARGS="${EXTRA_ARGS} --config ${BG_CONFIG}"
+        [ -n "${BG_BASELINE}" ] && EXTRA_ARGS="${EXTRA_ARGS} --baseline ${BG_BASELINE}"
+
+        buildgraph analyze --format json --output "${IMPACT_FILE}" ${EXTRA_ARGS}
+
+        HAS_CHANGES=$(jq -r '.has_changes' "${IMPACT_FILE}")
+        echo "has_changes=${HAS_CHANGES}" >> "$GITHUB_OUTPUT"
+
+        if [ "${HAS_CHANGES}" = "true" ]; then
+          SERVICES=$(jq -c '.impact.services_to_build' "${IMPACT_FILE}")
+        else
+          SERVICES='[]'
+        fi
+        echo "services=${SERVICES}"       >> "$GITHUB_OUTPUT"
+        echo "impact_file=${IMPACT_FILE}" >> "$GITHUB_OUTPUT"
+
+        echo "BuildGraph: has_changes=${HAS_CHANGES}, services=${SERVICES}"
+
+    - name: Upload impact report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: buildgraph-impact
+        path: ${{ steps.analyze.outputs.impact_file }}
+        retention-days: 7
+
+    - name: Generate new baseline
+      if: success()
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        BG_CONFIG: ${{ inputs.config }}
+        BG_BASELINE: ${{ inputs.baseline }}
+      run: |
+        EXTRA_ARGS=""
+        [ -n "${BG_CONFIG}"   ] && EXTRA_ARGS="${EXTRA_ARGS} --config ${BG_CONFIG}"
+        [ -n "${BG_BASELINE}" ] && EXTRA_ARGS="${EXTRA_ARGS} --baseline ${BG_BASELINE}"
+        buildgraph generate ${EXTRA_ARGS}
+
+    - name: Upload new baseline
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.baseline-artifact-name }}
+        path: .buildgraph/baseline.json
+        retention-days: ${{ inputs.baseline-retention-days }}

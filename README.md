@@ -21,7 +21,7 @@ jobs:
 
       - name: Run BuildGraph
         id: bg
-        uses: bubunyo/buildgraph-action@v1
+        uses: bubunyo/buildgraph-action@v0.0.0-alpha
 
   build:
     needs: analyze

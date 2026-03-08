@@ -84,7 +84,12 @@ runs:
 
     - name: Install buildgraph
       shell: bash
-      run: go install github.com/bubunyo/buildgraph/cmd@${{ inputs.version }}
+      run: |
+        go install github.com/bubunyo/buildgraph/cmd@${{ inputs.version }}
+        # go install places binaries in $GOPATH/bin which is not on PATH by
+        # default in GitHub Actions runners. Add it so subsequent steps can
+        # invoke 'buildgraph' directly.
+        echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
     - name: Run buildgraph analyze
       id: analyze
@@ -116,7 +121,7 @@ runs:
         echo "BuildGraph: has_changes=${HAS_CHANGES}, services=${SERVICES}"
 
     - name: Upload impact report
-      if: always()
+      if: always() && steps.analyze.outputs.impact_file != ''
       uses: actions/upload-artifact@v4
       with:
         name: buildgraph-impact

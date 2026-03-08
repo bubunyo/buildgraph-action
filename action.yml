@@ -57,6 +57,7 @@ outputs:
   impact-file:
     description: Path to the impact.json report written by buildgraph analyze.
     value: ${{ steps.analyze.outputs.impact_file }}
+    
 
 runs:
   using: composite
@@ -73,7 +74,7 @@ runs:
       uses: actions/download-artifact@v4
       with:
         name: ${{ inputs.baseline-artifact-name }}
-        path: .buildgraph
+        path: ${{ inputs.working-directory }}/.buildgraph
       continue-on-error: true
 
     - name: Install buildgraph
@@ -143,5 +144,5 @@ runs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.baseline-artifact-name }}
-        path: .buildgraph/baseline.json
+        path: ${{ inputs.working-directory }}/.buildgraph/baseline.json
         retention-days: ${{ inputs.baseline-retention-days }}

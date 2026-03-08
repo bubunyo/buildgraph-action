@@ -85,7 +85,7 @@ runs:
     - name: Install buildgraph
       shell: bash
       run: |
-        go install github.com/bubunyo/buildgraph/cmd@${{ inputs.version }}
+        go install github.com/bubunyo/buildgraph@${{ inputs.version }}
         # go install places binaries in $GOPATH/bin which is not on PATH by
         # default in GitHub Actions runners. Add it so subsequent steps can
         # invoke 'buildgraph' directly.

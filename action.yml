@@ -68,12 +68,24 @@ runs:
         go-version-file: ${{ inputs.go-version-file }}
         cache: true
 
+    # Normalize the branch name so it is safe to embed in an artifact name.
+    # github.ref_name can contain '/' (e.g. "feature/foo") and other chars
+    # that are invalid in artifact names; replace them all with '-'.
+    - name: Compute artifact names
+      id: names
+      shell: bash
+      run: |
+        BRANCH="${{ github.ref_name }}"
+        SAFE_BRANCH="${BRANCH//[^a-zA-Z0-9._-]/-}"
+        echo "baseline=${{ inputs.baseline-artifact-name }}-${SAFE_BRANCH}" >> "$GITHUB_OUTPUT"
+        echo "impact=buildgraph-impact-${SAFE_BRANCH}"                      >> "$GITHUB_OUTPUT"
+
     # Restore the baseline from the previous run on this branch.
     # continue-on-error so the very first run (no artifact yet) still works.
     - name: Download previous baseline
       uses: actions/download-artifact@v4
       with:
-        name: ${{ inputs.baseline-artifact-name }}
+        name: ${{ steps.names.outputs.baseline }}
         path: ${{ inputs.working-directory }}/.buildgraph
       continue-on-error: true
 
@@ -122,7 +134,7 @@ runs:
       if: always() && steps.analyze.outputs.impact_file != ''
       uses: actions/upload-artifact@v4
       with:
-        name: buildgraph-impact
+        name: ${{ steps.names.outputs.impact }}
         path: ${{ steps.analyze.outputs.impact_file }}
         retention-days: 7
 
@@ -143,6 +155,6 @@ runs:
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ inputs.baseline-artifact-name }}
+        name: ${{ steps.names.outputs.baseline }}
         path: ${{ inputs.working-directory }}/.buildgraph/baseline.json
         retention-days: ${{ inputs.baseline-retention-days }}

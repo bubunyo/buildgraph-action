@@ -50,8 +50,8 @@ outputs:
 
   services:
     description: >
-      JSON array of service names that need to be rebuilt,
-      e.g. '["service-a","service-b"]'. Empty array when has_changes is false.
+      JSON array of relative service paths that need to be rebuilt,
+      e.g. '["services/service-a","services/service-b"]'. Empty array when has_changes is false.
     value: ${{ steps.analyze.outputs.services }}
 
   impact-file:

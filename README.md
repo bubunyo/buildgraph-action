@@ -41,10 +41,10 @@ jobs:
           cache: true
 
       - name: Build ${{ matrix.service }}
-        run: go build -o bin/${{ matrix.service }} ./services/${{ matrix.service }}/...
+        run: go build -o bin/${{ matrix.service }} ./${{ matrix.service }}/...
 
       - name: Test ${{ matrix.service }}
-        run: go test ./services/${{ matrix.service }}/...
+        run: go test ./${{ matrix.service }}/...
 ```
 
 ## Inputs
@@ -64,7 +64,7 @@ jobs:
 | Output | Description |
 |---|---|
 | `has_changes` | `"true"` if any functions changed, `"false"` otherwise |
-| `services` | JSON array of service names to rebuild, e.g. `["service-a","service-b"]` |
+| `services` | JSON array of relative service paths to rebuild, e.g. `["services/service-a","services/service-b"]` |
 | `impact-file` | Path to the `impact.json` report written by `buildgraph analyze` |
 
 ## Examples

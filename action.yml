@@ -8,6 +8,15 @@ branding:
   color: blue
 
 inputs:
+  version:
+    description: >
+      Version of buildgraph to install, e.g. "v0.1.0".
+      Defaults to "latest", which installs the latest released version.
+      Use "source" to build from the local checked-out source tree
+      (intended for the buildgraph repo's own CI only).
+    required: false
+    default: latest
+
   go-version-file:
     description: >
       Path to the go.mod file used to select the Go toolchain version.
@@ -91,14 +100,18 @@ runs:
 
     - name: Install buildgraph
       shell: bash
+      env:
+        BG_VERSION: ${{ inputs.version }}
       run: |
-        # Build and install the buildgraph binary from the checked-out source.
-        # This avoids relying on the Go module proxy (which may lag behind
-        # recent pushes) and ensures the binary always matches the repo.
-        # go install places binaries in $GOPATH/bin which is not on PATH by
-        # default in GitHub Actions runners; add it so subsequent steps can
-        # invoke 'buildgraph' directly.
-        go install .
+        if [ "${BG_VERSION}" = "source" ]; then
+          # Build from the checked-out source tree (used by the buildgraph
+          # repo's own CI to test the action against the current commit).
+          go install .
+        elif [ "${BG_VERSION}" = "latest" ]; then
+          go install github.com/bubunyo/buildgraph@latest
+        else
+          go install github.com/bubunyo/buildgraph@${BG_VERSION}
+        fi
         echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
     - name: Run buildgraph analyze

@@ -51,7 +51,6 @@ jobs:
 
 | Input | Description | Default |
 |---|---|---|
-| `version` | BuildGraph version to install (e.g. `v0.1.0`) | `latest` |
 | `go-version-file` | Path to `go.mod` used to select the Go toolchain | `go.mod` |
 | `baseline-artifact-name` | Artifact name used to persist the baseline between runs | `buildgraph-baseline` |
 | `baseline-retention-days` | Days to retain the baseline artifact | `90` |
